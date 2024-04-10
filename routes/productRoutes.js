@@ -10,6 +10,51 @@ productRouter.get('/', async (req, res) => {
   res.send(products);
 });
 
+productRouter.post(
+  '/',
+  isAuth,
+  isAdmin,
+  expressAsyncHandler(async (req, res) => {
+    const newProduct = new Product({
+      name: 'sample name ' + Date.now(),
+      slug: 'sample-name-' + Date.now(),
+      image: '/images/Pan Arabe.jpg',
+      price: 100,
+      category: 'sample category',
+      quantity: '480 gr.',
+      presentation: 'Pieza, Paquete...',
+      countInStock: 100,
+      description: 'sample description',
+    });
+    const product = await newProduct.save();
+    res.send({ message: 'Product Created', product });
+  })
+);
+
+productRouter.put(
+  '/:id',
+  isAuth,
+  isAdmin,
+  expressAsyncHandler(async (req, res) => {
+    const productId = req.params.id;
+    const product = await Product.findById(productId);
+    if (product) {
+      product.name = req.body.name;
+      product.slug = req.body.slug;
+      product.price = req.body.price;
+      product.category = req.body.category;
+      product.quantity = req.body.quantity;
+      product.presentation = req.body.presentation;
+      product.image = req.body.image;
+      product.description = req.body.description;
+      await product.save();
+      res.send({ message: 'Product Updated' });
+    } else {
+      res.status(404).send({ message: 'Product Not Found' });
+    }
+  })
+);
+
 const PAGE_SIZE = 10;
 
 productRouter.get(

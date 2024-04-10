@@ -38,3 +38,24 @@ const port = process.env.PORT || 5000;
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
+
+// // Get today's date
+// const today = new Date('2024-03-28');
+
+// const dayOfWeek = today.getDay();
+
+// // Calculate last Sunday
+// const lastSunday = new Date(today);
+// lastSunday.setDate(today.getDate() - dayOfWeek - 14);
+
+// // Calculate last Saturday by adding 6 days to last Sunday
+// const lastSaturday = new Date(lastSunday);
+// lastSaturday.setDate(lastSunday.getDate() + 13);
+
+// // Format dates to YYYY-MM-DD (optional)
+// const formatYYYYMMDD = (date) =>
+//   date.toISOString().split('T')[0];
+
+// // Logging the dates
+// console.log(`Previous Sunday: ${formatYYYYMMDD(lastSunday)}`);
+// console.log(`Previous Saturday: ${formatYYYYMMDD(lastSaturday)}`);
