@@ -6,11 +6,8 @@ import Product from '../models/productModel.js';
 import {
   isAuth,
   isAdmin,
+  orderProcessedEmailTemplate,
   mailgun,
-  payOrderEmailTemplate,
-  orderIsReadyEmailTemplate,
-  estimatedDeliveryEmailTemplate,
-  orderDeliveredEmailTemplate,
 } from '../utils.js';
 
 const orderRouter = express.Router();
@@ -20,7 +17,9 @@ orderRouter.get(
   isAuth,
   isAdmin,
   expressAsyncHandler(async (req, res) => {
-    const orders = await Order.find().populate('user', 'name');
+    const orders = await Order.find()
+      .populate('user', 'name')
+      .sort({ createdAt: -1 });
     res.send(orders);
   })
 );
@@ -32,9 +31,7 @@ orderRouter.post(
     const newOrder = new Order({
       orderItems: req.body.orderItems.map((x) => ({ ...x, product: x._id })),
       shippingAddress: req.body.shippingAddress,
-      paymentMethod: req.body.paymentMethod,
       itemsPrice: req.body.itemsPrice,
-      shippingPrice: req.body.shippingPrice,
       taxPrice: req.body.taxPrice,
       totalPrice: req.body.totalPrice,
       user: req.user._id,
@@ -77,6 +74,16 @@ orderRouter.get(
       },
       { $sort: { _id: 1 } },
     ]);
+    const monthlyOrders = await Order.aggregate([
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+          numMonthlyOrders: { $sum: 1 },
+          monthlySales: { $sum: '$totalPrice' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
     const productCategories = await Product.aggregate([
       {
         $group: {
@@ -85,101 +92,47 @@ orderRouter.get(
         },
       },
     ]);
-    res.send({ users, orders, dailyOrders, productCategories });
-  })
-);
-
-orderRouter.get(
-  '/orders-tracking',
-  isAuth,
-  isAdmin,
-  expressAsyncHandler(async (req, res) => {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-
-    // Calculate last week
-    const lastSunday = new Date(today);
-    lastSunday.setDate(today.getDate() - dayOfWeek - 7);
-
-    const lastSaturday = new Date(lastSunday);
-    lastSaturday.setDate(lastSunday.getDate() + 6);
-
-    // Calculate 2 weeks ago
-    const lastSunday_2 = new Date(today);
-    lastSunday_2.setDate(today.getDate() - dayOfWeek - 14);
-
-    const lastSaturday_2 = new Date(lastSunday_2);
-    lastSaturday_2.setDate(lastSunday_2.getDate() + 13);
-
-    const ordersLastWeekByUser = await Order.aggregate([
+    const itemsSoldByProduct = await Order.aggregate([
       {
-        $match: {
-          createdAt: { $gte: lastSunday, $lte: lastSaturday },
-        },
+        $unwind: '$orderItems',
       },
       {
         $group: {
-          _id: '$user',
-          numberOfOrders: { $sum: 1 },
+          _id: '$orderItems.product',
+          totalQuantity: { $sum: '$orderItems.quantity' },
         },
       },
       {
         $lookup: {
-          from: 'users',
+          from: 'products', // Adjust this if your products collection is named differently
           localField: '_id',
           foreignField: '_id',
-          as: 'userDetails',
+          as: 'productDetails',
         },
       },
       {
-        $unwind: '$userDetails',
+        $unwind: '$productDetails', // Optional: Flattens the productDetails if you expect one product per ID
       },
       {
         $project: {
           _id: 0,
-          user_email: '$userDetails.email',
-          daysFrequency: '$userDetails.daysFrequency',
-          avgOrders: '$userDetails.avgOrders',
-          number_of_orders_last_week: '$numberOfOrders',
+          productId: '$_id',
+          productName: '$productDetails.name',
+          totalQuantity: 1,
         },
+      },
+      {
+        $sort: { totalQuantity: -1 }, // Sorts documents by totalQuantity in ascending order
       },
     ]);
-
-    const ordersLast_2_WeeksByUser = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: lastSunday_2, $lte: lastSaturday_2 },
-        },
-      },
-      {
-        $group: {
-          _id: '$user',
-          numberOfOrders: { $sum: 1 },
-        },
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'userDetails',
-        },
-      },
-      {
-        $unwind: '$userDetails',
-      },
-      {
-        $project: {
-          _id: 0,
-          user_email: '$userDetails.email',
-          daysFrequency: '$userDetails.daysFrequency',
-          avgOrders: '$userDetails.avgOrders',
-          number_of_orders_last_week: '$numberOfOrders',
-        },
-      },
-    ]);
-
-    res.send({ ordersLastWeekByUser, ordersLast_2_WeeksByUser });
+    res.send({
+      users,
+      orders,
+      dailyOrders,
+      monthlyOrders,
+      productCategories,
+      itemsSoldByProduct,
+    });
   })
 );
 
@@ -187,7 +140,20 @@ orderRouter.get(
   '/mine',
   isAuth,
   expressAsyncHandler(async (req, res) => {
-    const orders = await Order.find({ user: req.user._id });
+    const orders = await Order.find({ user: req.user._id }).sort({
+      createdAt: -1,
+    });
+    res.send(orders);
+  })
+);
+
+orderRouter.get(
+  '/mine/recent-orders',
+  isAuth,
+  expressAsyncHandler(async (req, res) => {
+    const orders = await Order.find({ user: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(10);
     res.send(orders);
   })
 );
@@ -206,149 +172,6 @@ orderRouter.get(
 );
 
 orderRouter.put(
-  '/:id',
-  isAuth,
-  isAdmin,
-  expressAsyncHandler(async (req, res) => {
-    const orderID = req.params.id;
-    const order = await Order.findById(orderID).populate('user', 'name');
-    if (order) {
-      order.estimatedDelivery = req.body.estimatedDelivery;
-      await order.save();
-      res.send({ message: 'Order Updated' });
-    } else {
-      res.status(404).send({ message: 'Order Not Found' });
-    }
-  })
-);
-
-orderRouter.put(
-  '/:id/estimatedDelivery',
-  isAuth,
-  expressAsyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id).populate(
-      'user',
-      'email name'
-    );
-    if (order) {
-      order.estimatedDelivery = req.body.estimatedDelivery;
-
-      const updatedOrder = await order.save();
-      mailgun()
-        .messages()
-        .send(
-          {
-            from: 'Samarit-Hanna <hola@samarithanna.com>',
-            to: `${order.user.name} <${order.user.email}>`,
-            subject: `Fecha de entrega de tu pedido`,
-            // subject: `New order ${order._id}`,
-            html: estimatedDeliveryEmailTemplate(order),
-          },
-          (error, body) => {
-            if (error) {
-              console.log(error);
-            } else {
-              console.log(body);
-            }
-          }
-        );
-
-      res.send({ message: 'Order Paid', order: updatedOrder });
-    } else {
-      res.status(404).send({ message: 'Order Not Found' });
-    }
-  })
-);
-
-orderRouter.put(
-  '/:id/ready',
-  isAuth,
-  expressAsyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id).populate(
-      'user',
-      'email name'
-    );
-    if (order) {
-      order.isReady = true;
-      order.readyAt = Date.now();
-
-      const updatedOrder = await order.save();
-      mailgun()
-        .messages()
-        .send(
-          {
-            from: 'Samarit-Hanna <hola@samarithanna.com>',
-            to: `${order.user.name} <${order.user.email}>`,
-            subject: `Tu pedido va en camino`,
-            // subject: `New order ${order._id}`,
-            html: orderIsReadyEmailTemplate(order),
-          },
-          (error, body) => {
-            if (error) {
-              console.log(error);
-            } else {
-              console.log(body);
-            }
-          }
-        );
-
-      res.send({ message: 'Order Ready', order: updatedOrder });
-    } else {
-      res.status(404).send({ message: 'Order Not Found' });
-    }
-  })
-  // expressAsyncHandler(async (req, res) => {
-  //   const order = await Order.findById(req.params.id);
-  //   if (order) {
-  //     order.isReady = true;
-  //     order.readyAt = Date.now();
-  //     await order.save();
-  //     res.send({ message: 'Order Delivered' });
-  //   } else {
-  //     res.status(404).send({ message: 'Order Not Found' });
-  //   }
-  // })
-);
-
-orderRouter.put(
-  '/:id/deliver',
-  isAuth,
-  expressAsyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id).populate(
-      'user',
-      'email name'
-    );
-    if (order) {
-      order.isDelivered = true;
-      order.deliveredAt = Date.now();
-
-      const updatedOrder = await order.save();
-      mailgun()
-        .messages()
-        .send(
-          {
-            from: 'Samarit-Hanna <hola@samarithanna.com>',
-            to: `${order.user.name} <${order.user.email}>`,
-            subject: `Tu pedido ha sido entregado`,
-            html: orderDeliveredEmailTemplate(order),
-          },
-          (error, body) => {
-            if (error) {
-              console.log(error);
-            } else {
-              console.log(body);
-            }
-          }
-        );
-
-      res.send({ message: 'Order Delivered', order: updatedOrder });
-    } else {
-      res.status(404).send({ message: 'Order Not Found' });
-    }
-  })
-);
-
-orderRouter.put(
   '/:id/order-processed',
   isAuth,
   expressAsyncHandler(async (req, res) => {
@@ -357,8 +180,6 @@ orderRouter.put(
       'email name'
     );
     if (order) {
-      // order.isPaid = false;
-      // order.paidAt = Date.now();
       order.orderEmailSent = true;
 
       const updatedOrder = await order.save();
@@ -370,7 +191,7 @@ orderRouter.put(
             to: `${order.user.name} <${order.user.email}>`,
             subject: `Tu pedido ha sido recibido`,
             // subject: `New order ${order._id}`,
-            html: payOrderEmailTemplate(order),
+            html: orderProcessedEmailTemplate(order),
           },
           (error, body) => {
             if (error) {
@@ -381,22 +202,7 @@ orderRouter.put(
           }
         );
 
-      res.send({ message: 'Order Paid', order: updatedOrder });
-    } else {
-      res.status(404).send({ message: 'Order Not Found' });
-    }
-  })
-);
-
-orderRouter.delete(
-  '/:id',
-  isAuth,
-  isAdmin,
-  expressAsyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id);
-    if (order) {
-      await order.remove();
-      res.send({ message: 'Order Deleted' });
+      res.send({ message: 'Order Processed', order: updatedOrder });
     } else {
       res.status(404).send({ message: 'Order Not Found' });
     }

@@ -1,9 +1,24 @@
 import express from 'express';
 import expressAsyncHandler from 'express-async-handler';
 import Product from '../models/productModel.js';
-import { isAuth, isAdmin } from '../utils.js';
+import { isAdmin, isAuth } from '../utils.js';
 
 const productRouter = express.Router();
+
+const accentsMap = {
+  a: '[aáàäâã]',
+  e: '[eéèëê]',
+  i: '[iíìïî]',
+  o: '[oóòöôõ]',
+  u: '[uúùüû]',
+};
+
+// Función para escapar caracteres especiales en la expresión regular y reemplazar vocales con sus variantes acentuadas
+const escapeRegExp = (string) => {
+  return string
+    .replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1')
+    .replace(/[aeiou]/gi, (matched) => accentsMap[matched.toLowerCase()]);
+};
 
 productRouter.get('/', async (req, res) => {
   const products = await Product.find();
@@ -21,7 +36,7 @@ productRouter.post(
       image: '/images/Pan Arabe.jpg',
       price: 100,
       category: 'sample category',
-      quantity: '480 gr.',
+      productQty: '480 gr.',
       presentation: 'Pieza, Paquete...',
       countInStock: 100,
       description: 'sample description',
@@ -43,7 +58,7 @@ productRouter.put(
       product.slug = req.body.slug;
       product.price = req.body.price;
       product.category = req.body.category;
-      product.quantity = req.body.quantity;
+      product.productQty = req.body.productQty;
       product.presentation = req.body.presentation;
       product.image = req.body.image;
       product.description = req.body.description;
@@ -55,7 +70,22 @@ productRouter.put(
   })
 );
 
-const PAGE_SIZE = 10;
+productRouter.delete(
+  '/:id',
+  isAuth,
+  isAdmin,
+  expressAsyncHandler(async (req, res) => {
+    const product = await Product.findById(req.params.id);
+    if (product) {
+      await product.deleteOne();
+      res.send({ message: 'Product Deleted' });
+    } else {
+      res.status(404).send({ message: 'Product Not Found' });
+    }
+  })
+);
+
+const PAGE_SIZE = 6;
 
 productRouter.get(
   '/admin',
@@ -87,28 +117,29 @@ productRouter.get(
     const page = query.page || 1;
     const category = query.category || '';
     const price = query.price || '';
-    const rating = query.rating || '';
     const order = query.order || '';
     const searchQuery = query.query || '';
 
-    const queryFilter =
-      searchQuery && searchQuery !== 'all'
-        ? {
-            name: {
-              $regex: searchQuery,
-              $options: 'i',
-            },
-          }
-        : {};
+    const regexQuery = escapeRegExp(searchQuery);
+
+    const queryFilter = regexQuery
+      ? {
+          name: {
+            $regex: regexQuery,
+            $options: 'i', // Case insensitive
+          },
+        }
+      : {};
+    // const queryFilter =
+    // searchQuery && searchQuery !== 'all'
+    //   ? {
+    //       name: {
+    //         $regex: searchQuery,
+    //         $options: 'i',
+    //       },
+    //     }
+    //   : {};
     const categoryFilter = category && category !== 'all' ? { category } : {};
-    const ratingFilter =
-      rating && rating !== 'all'
-        ? {
-            rating: {
-              $gte: Number(rating),
-            },
-          }
-        : {};
     const priceFilter =
       price && price !== 'all'
         ? {
@@ -136,7 +167,6 @@ productRouter.get(
       ...queryFilter,
       ...categoryFilter,
       ...priceFilter,
-      ...ratingFilter,
     })
       .sort(sortOrder)
       .skip(pageSize * (page - 1))
@@ -146,7 +176,6 @@ productRouter.get(
       ...queryFilter,
       ...categoryFilter,
       ...priceFilter,
-      ...ratingFilter,
     });
     res.send({
       products,
@@ -166,13 +195,14 @@ productRouter.get(
 );
 
 productRouter.get('/slug/:slug', async (req, res) => {
-  const product = await Product.findOne({ slug: req.params.slug });
+  const product = await Product.findOne({ slug: { $eq: req.params.slug } });
   if (product) {
     res.send(product);
   } else {
     res.status(404).send({ message: 'Product Not Found' });
   }
 });
+
 productRouter.get('/:id', async (req, res) => {
   const product = await Product.findById(req.params.id);
   if (product) {
