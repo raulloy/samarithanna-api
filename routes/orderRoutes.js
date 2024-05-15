@@ -3,11 +3,15 @@ import expressAsyncHandler from 'express-async-handler';
 import Order from '../models/orderModel.js';
 import User from '../models/userModel.js';
 import Product from '../models/productModel.js';
+import moment from 'moment';
 import {
   isAuth,
   isAdmin,
   orderProcessedEmailTemplate,
   mailgun,
+  estimatedDeliveryEmailTemplate,
+  orderIsReadyEmailTemplate,
+  orderDeliveredEmailTemplate,
 } from '../utils.js';
 
 const orderRouter = express.Router();
@@ -30,9 +34,11 @@ orderRouter.post(
   expressAsyncHandler(async (req, res) => {
     const newOrder = new Order({
       orderItems: req.body.orderItems.map((x) => ({ ...x, product: x._id })),
+      returnItems: req.body.returnItems.map((x) => ({ ...x, product: x._id })),
+      purchaseOrder: req.body.purchaseOrder,
       shippingAddress: req.body.shippingAddress,
-      itemsPrice: req.body.itemsPrice,
-      taxPrice: req.body.taxPrice,
+      subtotal: req.body.subtotal,
+      ieps: req.body.ieps,
       totalPrice: req.body.totalPrice,
       user: req.user._id,
     });
@@ -137,6 +143,30 @@ orderRouter.get(
 );
 
 orderRouter.get(
+  '/mine/stats',
+  isAuth,
+  expressAsyncHandler(async (req, res) => {
+    const today = moment().startOf('day');
+    const startOfMonth = moment().startOf('month');
+
+    const todayOrders = await Order.find({
+      user: req.user._id,
+      createdAt: { $gte: today.toDate() },
+    }).sort({ createdAt: -1 });
+
+    const monthOrders = await Order.find({
+      user: req.user._id,
+      createdAt: { $gte: startOfMonth.toDate() },
+    }).sort({ createdAt: -1 });
+
+    res.send({
+      todayOrdersCount: todayOrders.length,
+      monthOrdersCount: monthOrders.length,
+    });
+  })
+);
+
+orderRouter.get(
   '/mine',
   isAuth,
   expressAsyncHandler(async (req, res) => {
@@ -203,6 +233,120 @@ orderRouter.put(
         );
 
       res.send({ message: 'Order Processed', order: updatedOrder });
+    } else {
+      res.status(404).send({ message: 'Order Not Found' });
+    }
+  })
+);
+
+orderRouter.put(
+  '/:id/estimatedDelivery',
+  isAuth,
+  expressAsyncHandler(async (req, res) => {
+    const order = await Order.findById(req.params.id).populate(
+      'user',
+      'email name'
+    );
+    if (order) {
+      order.estimatedDelivery = req.body.estimatedDelivery;
+
+      const updatedOrder = await order.save();
+      mailgun()
+        .messages()
+        .send(
+          {
+            from: 'Samarit-Hanna <hola@samarithanna.com>',
+            to: `${order.user.name} <${order.user.email}>`,
+            subject: `Fecha de entrega de tu pedido`,
+            html: estimatedDeliveryEmailTemplate(order),
+          },
+          (error, body) => {
+            if (error) {
+              console.log(error);
+            } else {
+              console.log(body);
+            }
+          }
+        );
+
+      res.send({ message: 'Order delivery scheduled', order: updatedOrder });
+    } else {
+      res.status(404).send({ message: 'Order Not Found' });
+    }
+  })
+);
+
+orderRouter.put(
+  '/:id/ready',
+  isAuth,
+  expressAsyncHandler(async (req, res) => {
+    const order = await Order.findById(req.params.id).populate(
+      'user',
+      'email name'
+    );
+    if (order) {
+      order.isReady = true;
+      order.readyAt = Date.now();
+
+      const updatedOrder = await order.save();
+      mailgun()
+        .messages()
+        .send(
+          {
+            from: 'Samarit-Hanna <hola@samarithanna.com>',
+            to: `${order.user.name} <${order.user.email}>`,
+            subject: `Tu pedido va en camino`,
+            // subject: `New order ${order._id}`,
+            html: orderIsReadyEmailTemplate(order),
+          },
+          (error, body) => {
+            if (error) {
+              console.log(error);
+            } else {
+              console.log(body);
+            }
+          }
+        );
+
+      res.send({ message: 'Order Ready', order: updatedOrder });
+    } else {
+      res.status(404).send({ message: 'Order Not Found' });
+    }
+  })
+);
+
+orderRouter.put(
+  '/:id/deliver',
+  isAuth,
+  expressAsyncHandler(async (req, res) => {
+    const order = await Order.findById(req.params.id).populate(
+      'user',
+      'email name'
+    );
+    if (order) {
+      order.deliveredAt = Date.now();
+      order.isDelivered = true;
+
+      const updatedOrder = await order.save();
+      mailgun()
+        .messages()
+        .send(
+          {
+            from: 'Samarit-Hanna <hola@samarithanna.com>',
+            to: `${order.user.name} <${order.user.email}>`,
+            subject: `Tu pedido ha sido entregado`,
+            html: orderDeliveredEmailTemplate(order),
+          },
+          (error, body) => {
+            if (error) {
+              console.log(error);
+            } else {
+              console.log(body);
+            }
+          }
+        );
+
+      res.send({ message: 'Order Delivered', order: updatedOrder });
     } else {
       res.status(404).send({ message: 'Order Not Found' });
     }
