@@ -53,6 +53,27 @@ const getWeekDay = (dateStr) => {
   return date.format('dddd'); // Obtiene el nombre del día en inglés
 };
 
+const initializeUsersTracking = async (frequency) => {
+  const users = await User.find({ daysFrequency: frequency }, 'name minOrders');
+  return users.reduce((acc, user) => {
+    acc[user._id.toString()] = {
+      userName: user.name,
+      minOrders: user.minOrders || 0,
+      orders: {
+        Monday: 0,
+        Tuesday: 0,
+        Wednesday: 0,
+        Thursday: 0,
+        Friday: 0,
+        Saturday: 0,
+        Sunday: 0,
+      },
+      totalOrders: 0, // Inicializar el total de pedidos en la semana
+    };
+    return acc;
+  }, {});
+};
+
 orderRouter.get(
   '/users-daily-tracking',
   isAuth,
@@ -61,10 +82,10 @@ orderRouter.get(
     const startOfWeek = moment().startOf('isoWeek').toDate();
     const endOfWeek = moment().endOf('isoWeek').toDate();
 
-    console.log('Start of week:', startOfWeek);
-    console.log('End of week:', endOfWeek);
+    // console.log('Start of week:', startOfWeek);
+    // console.log('End of week:', endOfWeek);
 
-    const users = await User.find({}, 'name');
+    // const users = await User.find({}, 'name minOrders');
 
     const dailyUserOrders = await Order.aggregate([
       {
@@ -93,23 +114,43 @@ orderRouter.get(
         $unwind: '$userDetails',
       },
       {
-        $project: {
-          _id: 0,
-          userId: '$_id.user',
-          userName: '$userDetails.name',
-          day: '$_id.day',
-          ordersCount: 1,
+        $group: {
+          _id: '$_id.user',
+          userName: { $first: '$userDetails.name' },
+          minOrders: { $first: '$userDetails.minOrders' },
+          dailyOrders: {
+            $push: {
+              day: '$_id.day',
+              ordersCount: '$ordersCount',
+            },
+          },
+          totalOrders: { $sum: '$ordersCount' },
         },
       },
       {
-        $sort: { userName: 1, day: 1 }, // Ordena por nombre de usuario y luego por día
+        $project: {
+          _id: 0,
+          userId: '$_id',
+          userName: 1,
+          minOrders: 1,
+          dailyOrders: 1,
+          totalOrders: 1,
+        },
+      },
+      {
+        $sort: { userName: 1 }, // Ordena por nombre de usuario
       },
     ]);
 
+    // console.log('Daily User Orders:', dailyUserOrders);
+
+    const users = await User.find({ daysFrequency: 7 }, 'name minOrders');
+
     // Inicializar el objeto de seguimiento de usuarios con todos los usuarios
     const usersTracking = users.reduce((acc, user) => {
-      acc[user._id] = {
+      acc[user._id.toString()] = {
         userName: user.name,
+        minOrders: user.minOrders || 0,
         orders: {
           Monday: 0,
           Tuesday: 0,
@@ -119,76 +160,128 @@ orderRouter.get(
           Saturday: 0,
           Sunday: 0,
         },
+        totalOrders: 0, // Inicializar el total de pedidos en la semana
       };
       return acc;
     }, {});
 
     // Actualizar el objeto de seguimiento con los pedidos
     dailyUserOrders.forEach((current) => {
-      const { userId, day, ordersCount } = current;
-      const weekDay = getWeekDay(day); // Convertir la fecha en nombre del día de la semana
-      usersTracking[userId].orders[weekDay] = ordersCount;
+      const { userId, dailyOrders, totalOrders } = current;
+      if (usersTracking[userId.toString()]) {
+        dailyOrders.forEach(({ day, ordersCount }) => {
+          const weekDay = getWeekDay(day); // Convertir la fecha en nombre del día de la semana
+          usersTracking[userId.toString()].orders[weekDay] = ordersCount;
+        });
+        usersTracking[userId.toString()].totalOrders = totalOrders;
+      } else {
+        console.warn(`User ID ${userId} not found in usersTracking`); // Advertencia si el usuario no se encuentra
+      }
     });
 
-    console.log(Object.values(usersTracking));
+    // console.log(Object.values(usersTracking));
 
     res.send(Object.values(usersTracking));
   })
 );
 
+const getUsersDailyTracking = async (startDate, endDate) => {
+  const dailyUserOrders = await Order.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startDate, $lte: endDate },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          user: '$user',
+          day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        },
+        ordersCount: { $sum: 1 },
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: '_id.user',
+        foreignField: '_id',
+        as: 'userDetails',
+      },
+    },
+    {
+      $unwind: '$userDetails',
+    },
+    {
+      $group: {
+        _id: '$_id.user',
+        userName: { $first: '$userDetails.name' },
+        minOrders: { $first: '$userDetails.minOrders' },
+        dailyOrders: {
+          $push: {
+            day: '$_id.day',
+            ordersCount: '$ordersCount',
+          },
+        },
+        totalOrders: { $sum: '$ordersCount' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        userId: '$_id',
+        userName: 1,
+        minOrders: 1,
+        dailyOrders: 1,
+        totalOrders: 1,
+      },
+    },
+    {
+      $sort: { userName: 1 }, // Ordena por nombre de usuario
+    },
+  ]);
+
+  return dailyUserOrders;
+};
+
 orderRouter.get(
-  '/users-daily-tracking',
+  '/users-daily-tracking-2',
   isAuth,
   isAdmin,
   expressAsyncHandler(async (req, res) => {
-    const startOfWeek = moment().startOf('isoWeek').toDate();
-    const endOfWeek = moment().endOf('isoWeek').toDate();
+    const startOfCurrentWeek = moment().startOf('isoWeek').toDate();
+    const endOfCurrentWeek = moment().endOf('isoWeek').toDate();
+    const startOfLastWeek = moment()
+      .subtract(1, 'weeks')
+      .startOf('isoWeek')
+      .toDate();
+    const endOfLastWeek = moment()
+      .subtract(1, 'weeks')
+      .endOf('isoWeek')
+      .toDate();
 
-    const dailyUserOrders = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startOfWeek, $lte: endOfWeek },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            user: '$user',
-            day: { $dateToString: { format: '%dddd', date: '$createdAt' } },
-          },
-          ordersCount: { $sum: 1 },
-        },
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id.user',
-          foreignField: '_id',
-          as: 'userDetails',
-        },
-      },
-      {
-        $unwind: '$userDetails',
-      },
-      {
-        $project: {
-          _id: 0,
-          userId: '$_id.user',
-          userName: '$userDetails.name',
-          day: '$_id.day',
-          ordersCount: 1,
-        },
-      },
-      {
-        $sort: { userName: 1, day: 1 }, // Ordena por nombre de usuario y luego por día
-      },
-    ]);
+    // console.log('Start of current week:', startOfCurrentWeek);
+    // console.log('End of current week:', endOfCurrentWeek);
+    // console.log('Start of last week:', startOfLastWeek);
+    // console.log('End of last week:', endOfLastWeek);
 
-    const usersTracking = dailyUserOrders.reduce((acc, current) => {
-      const { userId, userName, day, ordersCount } = current;
-      if (!acc[userId]) {
-        acc[userId] = {
-          userName,
+    const users = await User.find({ daysFrequency: 14 }, 'name minOrders');
+
+    const currentWeekOrders = await getUsersDailyTracking(
+      startOfCurrentWeek,
+      endOfCurrentWeek
+    );
+    const lastWeekOrders = await getUsersDailyTracking(
+      startOfLastWeek,
+      endOfLastWeek
+    );
+
+    // Inicializar el objeto de seguimiento de usuarios con todos los usuarios para ambas semanas
+    const usersTracking = users.reduce((acc, user) => {
+      acc[user._id.toString()] = {
+        userName: user.name,
+        minOrders: user.minOrders || 0,
+        currentWeek: {
           orders: {
             Monday: 0,
             Tuesday: 0,
@@ -198,13 +291,53 @@ orderRouter.get(
             Saturday: 0,
             Sunday: 0,
           },
-        };
-      }
-      acc[userId].orders[day] = ordersCount;
+          totalOrders: 0,
+        },
+        lastWeek: {
+          orders: {
+            Monday: 0,
+            Tuesday: 0,
+            Wednesday: 0,
+            Thursday: 0,
+            Friday: 0,
+            Saturday: 0,
+            Sunday: 0,
+          },
+          totalOrders: 0,
+        },
+      };
       return acc;
     }, {});
 
-    console.log(Object.values(usersTracking));
+    // console.log('Users Tracking Initialized:', Object.keys(usersTracking));
+
+    // Actualizar el objeto de seguimiento con los pedidos de la semana actual
+    currentWeekOrders.forEach((current) => {
+      const { userId, dailyOrders, totalOrders } = current;
+      if (usersTracking[userId.toString()]) {
+        dailyOrders.forEach(({ day, ordersCount }) => {
+          const weekDay = getWeekDay(day); // Convertir la fecha en nombre del día de la semana
+          usersTracking[userId.toString()].currentWeek.orders[weekDay] =
+            ordersCount;
+        });
+        usersTracking[userId.toString()].currentWeek.totalOrders = totalOrders;
+      }
+    });
+
+    // Actualizar el objeto de seguimiento con los pedidos de la semana pasada
+    lastWeekOrders.forEach((current) => {
+      const { userId, dailyOrders, totalOrders } = current;
+      if (usersTracking[userId.toString()]) {
+        dailyOrders.forEach(({ day, ordersCount }) => {
+          const weekDay = getWeekDay(day); // Convertir la fecha en nombre del día de la semana
+          usersTracking[userId.toString()].lastWeek.orders[weekDay] =
+            ordersCount;
+        });
+        usersTracking[userId.toString()].lastWeek.totalOrders = totalOrders;
+      }
+    });
+
+    // console.log(Object.values(usersTracking));
 
     res.send(Object.values(usersTracking));
   })
