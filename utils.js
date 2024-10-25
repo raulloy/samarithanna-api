@@ -7,7 +7,7 @@ export const generateToken = (user) => {
       _id: user._id,
       name: user.name,
       email: user.email,
-      isAdmin: user.isAdmin,
+      userType: user.userType,
     },
     process.env.JWT_SECRET,
     {
@@ -34,10 +34,21 @@ export const isAuth = (req, res, next) => {
 };
 
 export const isAdmin = (req, res, next) => {
-  if (req.user && req.user.isAdmin) {
+  if (req.user && req.user.userType === 'admin') {
     next();
   } else {
     res.status(401).send({ message: 'Invalid Admin Token' });
+  }
+};
+
+export const isAdminOrDelivery = (req, res, next) => {
+  if (
+    req.user &&
+    (req.user.userType === 'admin' || req.user.userType === 'delivery')
+  ) {
+    next();
+  } else {
+    res.status(401).send({ message: 'Access Denied' });
   }
 };
 
@@ -48,12 +59,15 @@ export const mailgun = () =>
   });
 
 export const orderProcessedEmailTemplate = (order) => {
+  const orderId = order._id.toString();
+  const orderIdLast5 = orderId.slice(-5);
+
   return `
     <div style="text-align: center;">
       <h1 style="color: #333;">¡Gracias por tu compra!</h1>
       <p>Hola ${order.user.name},</p>
       <p>Tu pedido ha sido procesado.</p>
-      <h2 style="color: #444;">Pedido ${order._id}</h2>
+      <h2 style="color: #444;">Pedido S-${orderIdLast5}</h2>
       <table style="margin: auto; width: 80%; border-collapse: collapse; border: 1px solid #ccc;">
         <thead>
           <tr>
@@ -116,6 +130,8 @@ export const orderProcessedEmailTemplate = (order) => {
 };
 
 export const estimatedDeliveryEmailTemplate = (order) => {
+  const orderId = order._id.toString();
+  const orderIdLast5 = orderId.slice(-5);
   return `
     <div style="text-align: center;">
       <h1 style="color: #333;">¡Tu pedido está siendo preparado!</h1>
@@ -129,7 +145,7 @@ export const estimatedDeliveryEmailTemplate = (order) => {
           day: 'numeric',
         }
       )}.</p>
-      <h2 style="color: #444;">Pedido ${order._id}</h2>
+      <h2 style="color: #444;">Pedido S-${orderIdLast5}</h2>
       <table style="margin: auto; width: 80%; border-collapse: collapse; border: 1px solid #ccc;">
         <thead>
           <tr>
@@ -186,12 +202,14 @@ export const estimatedDeliveryEmailTemplate = (order) => {
 };
 
 export const orderIsReadyEmailTemplate = (order) => {
+  const orderId = order._id.toString();
+  const orderIdLast5 = orderId.slice(-5);
   return `
     <div style="text-align: center;">
       <h1 style="color: #333;">¡Tu pedido está listo!</h1>
       <p>Hola ${order.user.name},</p>
       <p>Tu pedido está listo y va en camino.</p>
-      <h2 style="color: #444;">Pedido ${order._id}</h2>
+      <h2 style="color: #444;">Pedido S-${orderIdLast5}</h2>
       <table style="margin: auto; width: 80%; border-collapse: collapse; border: 1px solid #ccc;">
         <thead>
           <tr>
@@ -254,12 +272,14 @@ export const orderIsReadyEmailTemplate = (order) => {
 };
 
 export const orderDeliveredEmailTemplate = (order) => {
+  const orderId = order._id.toString();
+  const orderIdLast5 = orderId.slice(-5);
   return `
     <div style="text-align: center;">
       <h1 style="color: #333;">¡Tu pedido ha sido entregado!</h1>
       <p>Hola ${order.user.name},</p>
       <p>Tu pedido ha sido entregado.</p>
-      <h2 style="color: #444;">Pedido ${order._id}</h2>
+      <h2 style="color: #444;">Pedido S-${orderIdLast5}</h2>
       <table style="margin: auto; width: 80%; border-collapse: collapse; border: 1px solid #ccc;">
         <thead>
           <tr>

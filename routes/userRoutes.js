@@ -39,9 +39,11 @@ userRouter.put(
     if (user) {
       user.name = req.body.name || user.name;
       user.email = req.body.email || user.email;
-      user.isAdmin = Boolean(req.body.isAdmin);
+      user.userType = req.body.userType || user.userType;
+      user.isAdmitted = req.body.isAdmitted ?? user.isAdmitted;
       user.daysFrequency = req.body.daysFrequency;
       user.minOrders = req.body.minOrders;
+
       const updatedUser = await user.save();
       res.send({ message: 'User Updated', user: updatedUser });
     } else {
@@ -60,7 +62,8 @@ userRouter.post(
           _id: user._id,
           name: user.name,
           email: user.email,
-          isAdmin: user.isAdmin,
+          userType: user.userType,
+          isAdmitted: user.isAdmitted,
           token: generateToken(user),
         });
         return;
@@ -77,6 +80,8 @@ userRouter.post(
       name: req.body.name,
       email: req.body.email,
       password: bcrypt.hashSync(req.body.password),
+      userType: req.body.userType || 'user',
+      isAdmitted: req.body.isAdmitted || false,
     });
 
     const user = await newUser.save();
@@ -84,7 +89,8 @@ userRouter.post(
       _id: user._id,
       name: user.name,
       email: user.email,
-      isAdmin: user.isAdmin,
+      userType: user.userType,
+      isAdmitted: user.isAdmitted,
       token: generateToken(user),
     });
   })

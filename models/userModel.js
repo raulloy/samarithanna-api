@@ -5,7 +5,12 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    isAdmin: { type: Boolean, default: false, required: true },
+    userType: {
+      type: String,
+      enum: ['admin', 'delivery', 'user'],
+      required: true,
+    },
+    isAdmitted: { type: Boolean, default: false, required: true },
     daysFrequency: { type: Number },
     minOrders: { type: Number },
   },

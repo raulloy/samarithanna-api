@@ -3,23 +3,25 @@ import expressAsyncHandler from 'express-async-handler';
 import Order from '../models/orderModel.js';
 import User from '../models/userModel.js';
 import Product from '../models/productModel.js';
-import moment from 'moment';
+import moment from 'moment-timezone';
 import {
   isAuth,
   isAdmin,
   orderProcessedEmailTemplate,
-  mailgun,
   estimatedDeliveryEmailTemplate,
   orderIsReadyEmailTemplate,
   orderDeliveredEmailTemplate,
+  isAdminOrDelivery,
 } from '../utils.js';
+import { sendEmail } from '../mailer.js';
 
 const orderRouter = express.Router();
 
 orderRouter.get(
   '/',
   isAuth,
-  isAdmin,
+  // isAdmin,
+  isAdminOrDelivery,
   expressAsyncHandler(async (req, res) => {
     const orders = await Order.find()
       .populate('user', 'name')
@@ -48,44 +50,28 @@ orderRouter.post(
   })
 );
 
-const getWeekDay = (dateStr) => {
-  const date = moment(dateStr, 'YYYY-MM-DD');
-  return date.format('dddd'); // Obtiene el nombre del día en inglés
-};
-
-const initializeUsersTracking = async (frequency) => {
-  const users = await User.find({ daysFrequency: frequency }, 'name minOrders');
-  return users.reduce((acc, user) => {
-    acc[user._id.toString()] = {
-      userName: user.name,
-      minOrders: user.minOrders || 0,
-      orders: {
-        Monday: 0,
-        Tuesday: 0,
-        Wednesday: 0,
-        Thursday: 0,
-        Friday: 0,
-        Saturday: 0,
-        Sunday: 0,
-      },
-      totalOrders: 0, // Inicializar el total de pedidos en la semana
-    };
-    return acc;
-  }, {});
-};
+function getWeekDay(dateString) {
+  const date = moment.tz(dateString, 'America/Mexico_City');
+  const weekDay = date.format('dddd');
+  return weekDay;
+}
 
 orderRouter.get(
   '/users-daily-tracking',
   isAuth,
   isAdmin,
   expressAsyncHandler(async (req, res) => {
-    const startOfWeek = moment().startOf('isoWeek').toDate();
-    const endOfWeek = moment().endOf('isoWeek').toDate();
+    const startOfWeek = moment()
+      .tz('America/Mexico_City')
+      .startOf('isoWeek')
+      .toDate();
+    const endOfWeek = moment()
+      .tz('America/Mexico_City')
+      .endOf('isoWeek')
+      .toDate();
 
     // console.log('Start of week:', startOfWeek);
     // console.log('End of week:', endOfWeek);
-
-    // const users = await User.find({}, 'name minOrders');
 
     const dailyUserOrders = await Order.aggregate([
       {
@@ -94,10 +80,22 @@ orderRouter.get(
         },
       },
       {
+        $project: {
+          user: 1,
+          day: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt',
+              timezone: 'America/Mexico_City',
+            },
+          },
+        },
+      },
+      {
         $group: {
           _id: {
             user: '$user',
-            day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            day: '$day',
           },
           ordersCount: { $sum: 1 },
         },
@@ -138,7 +136,7 @@ orderRouter.get(
         },
       },
       {
-        $sort: { userName: 1 }, // Ordena por nombre de usuario
+        $sort: { userName: 1 },
       },
     ]);
 
@@ -146,7 +144,6 @@ orderRouter.get(
 
     const users = await User.find({ daysFrequency: 7 }, 'name minOrders');
 
-    // Inicializar el objeto de seguimiento de usuarios con todos los usuarios
     const usersTracking = users.reduce((acc, user) => {
       acc[user._id.toString()] = {
         userName: user.name,
@@ -160,26 +157,25 @@ orderRouter.get(
           Saturday: 0,
           Sunday: 0,
         },
-        totalOrders: 0, // Inicializar el total de pedidos en la semana
+        totalOrders: 0,
       };
       return acc;
     }, {});
 
-    // Actualizar el objeto de seguimiento con los pedidos
     dailyUserOrders.forEach((current) => {
       const { userId, dailyOrders, totalOrders } = current;
       if (usersTracking[userId.toString()]) {
         dailyOrders.forEach(({ day, ordersCount }) => {
           const weekDay = getWeekDay(day); // Convertir la fecha en nombre del día de la semana
-          usersTracking[userId.toString()].orders[weekDay] = ordersCount;
+          usersTracking[userId.toString()].orders[weekDay] += ordersCount; // Usar += para acumular los pedidos
         });
         usersTracking[userId.toString()].totalOrders = totalOrders;
       } else {
-        console.warn(`User ID ${userId} not found in usersTracking`); // Advertencia si el usuario no se encuentra
+        console.warn(`User ID ${userId} not found in usersTracking`);
       }
     });
 
-    // console.log(Object.values(usersTracking));
+    // console.log('Users Tracking:', usersTracking);
 
     res.send(Object.values(usersTracking));
   })
@@ -196,7 +192,13 @@ const getUsersDailyTracking = async (startDate, endDate) => {
       $group: {
         _id: {
           user: '$user',
-          day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          day: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt',
+              timezone: 'America/Mexico_City',
+            },
+          },
         },
         ordersCount: { $sum: 1 },
       },
@@ -249,8 +251,11 @@ orderRouter.get(
   isAuth,
   isAdmin,
   expressAsyncHandler(async (req, res) => {
-    const startOfCurrentWeek = moment().startOf('isoWeek').toDate();
-    const endOfCurrentWeek = moment().endOf('isoWeek').toDate();
+    const startOfCurrentWeek = moment()
+      .startOf('isoWeek')
+      .add(1, 'day')
+      .toDate();
+    const endOfCurrentWeek = moment().endOf('isoWeek').add(1, 'day').toDate();
     const startOfLastWeek = moment()
       .subtract(1, 'weeks')
       .startOf('isoWeek')
@@ -508,24 +513,15 @@ orderRouter.put(
       order.orderEmailSent = true;
 
       const updatedOrder = await order.save();
-      mailgun()
-        .messages()
-        .send(
-          {
-            from: 'Samarit-Hanna <hola@samarithanna.com>',
-            to: `${order.user.name} <${order.user.email}>`,
-            subject: `Tu pedido ha sido recibido`,
-            // subject: `New order ${order._id}`,
-            html: orderProcessedEmailTemplate(order),
-          },
-          (error, body) => {
-            if (error) {
-              console.log(error);
-            } else {
-              console.log(body);
-            }
-          }
-        );
+
+      // Sending Order Processed email
+      const orderProcessedHtml = orderProcessedEmailTemplate(order);
+      sendEmail(
+        order.user.email,
+        order.user.name,
+        'Tu pedido ha sido recibido',
+        orderProcessedHtml
+      );
 
       res.send({ message: 'Order Processed', order: updatedOrder });
     } else {
@@ -546,23 +542,15 @@ orderRouter.put(
       order.estimatedDelivery = req.body.estimatedDelivery;
 
       const updatedOrder = await order.save();
-      mailgun()
-        .messages()
-        .send(
-          {
-            from: 'Samarit-Hanna <hola@samarithanna.com>',
-            to: `${order.user.name} <${order.user.email}>`,
-            subject: `Fecha de entrega de tu pedido`,
-            html: estimatedDeliveryEmailTemplate(order),
-          },
-          (error, body) => {
-            if (error) {
-              console.log(error);
-            } else {
-              console.log(body);
-            }
-          }
-        );
+
+      // Sending Estimated Delivery email
+      const estimatedDeliveryHtml = estimatedDeliveryEmailTemplate(order);
+      sendEmail(
+        order.user.email,
+        order.user.name,
+        'Tu pedido está siendo preparado',
+        estimatedDeliveryHtml
+      );
 
       res.send({ message: 'Order delivery scheduled', order: updatedOrder });
     } else {
@@ -584,24 +572,15 @@ orderRouter.put(
       order.readyAt = Date.now();
 
       const updatedOrder = await order.save();
-      mailgun()
-        .messages()
-        .send(
-          {
-            from: 'Samarit-Hanna <hola@samarithanna.com>',
-            to: `${order.user.name} <${order.user.email}>`,
-            subject: `Tu pedido va en camino`,
-            // subject: `New order ${order._id}`,
-            html: orderIsReadyEmailTemplate(order),
-          },
-          (error, body) => {
-            if (error) {
-              console.log(error);
-            } else {
-              console.log(body);
-            }
-          }
-        );
+
+      // Sending Order Is Ready email
+      const orderIsReadyHtml = orderIsReadyEmailTemplate(order);
+      sendEmail(
+        order.user.email,
+        order.user.name,
+        'Tu pedido va en camino',
+        orderIsReadyHtml
+      );
 
       res.send({ message: 'Order Ready', order: updatedOrder });
     } else {
@@ -623,23 +602,15 @@ orderRouter.put(
       order.isDelivered = true;
 
       const updatedOrder = await order.save();
-      mailgun()
-        .messages()
-        .send(
-          {
-            from: 'Samarit-Hanna <hola@samarithanna.com>',
-            to: `${order.user.name} <${order.user.email}>`,
-            subject: `Tu pedido ha sido entregado`,
-            html: orderDeliveredEmailTemplate(order),
-          },
-          (error, body) => {
-            if (error) {
-              console.log(error);
-            } else {
-              console.log(body);
-            }
-          }
-        );
+
+      // Sending Order Delivered email
+      const orderDeliveredHtml = orderDeliveredEmailTemplate(order);
+      sendEmail(
+        order.user.email,
+        order.user.name,
+        'Tu pedido ha sido entregado',
+        orderDeliveredHtml
+      );
 
       res.send({ message: 'Order Delivered', order: updatedOrder });
     } else {
