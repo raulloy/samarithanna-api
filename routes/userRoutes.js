@@ -2,7 +2,13 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import expressAsyncHandler from 'express-async-handler';
 import User from '../models/userModel.js';
-import { isAuth, isAdmin, generateToken } from '../utils.js';
+import {
+  isAuth,
+  isAdmin,
+  generateToken,
+  welcomeEmailTemplate,
+} from '../utils.js';
+import { sendEmail } from '../mailer.js';
 
 const userRouter = express.Router();
 
@@ -93,6 +99,12 @@ userRouter.post(
       isAdmitted: user.isAdmitted,
       token: generateToken(user),
     });
+
+    try {
+      sendWelcomeEmail(user.name, user.email);
+    } catch (error) {
+      console.log(error);
+    }
   })
 );
 
@@ -121,5 +133,16 @@ userRouter.put(
     }
   })
 );
+
+const sendWelcomeEmail = async (name, email) => {
+  try {
+    const welcomeEmailHtml = welcomeEmailTemplate(name);
+    sendEmail(email, name, '¡Bienvenido a Samarithanna!', welcomeEmailHtml);
+
+    console.log('Welcome email sent successfully');
+  } catch (error) {
+    console.error(error);
+  }
+};
 
 export default userRouter;

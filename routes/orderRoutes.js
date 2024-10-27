@@ -12,6 +12,7 @@ import {
   orderIsReadyEmailTemplate,
   orderDeliveredEmailTemplate,
   isAdminOrDelivery,
+  orderProcessedAdmin,
 } from '../utils.js';
 import { sendEmail } from '../mailer.js';
 
@@ -514,10 +515,19 @@ orderRouter.put(
 
       const updatedOrder = await order.save();
 
+      // Sending New Order email
+      const orderProcessedAdminHtml = orderProcessedAdmin(order);
+      sendEmail(
+        ['raul.loy@gmail.com'],
+        order.user.name,
+        `Nuevo Pedido de ${order.user.name}`,
+        orderProcessedAdminHtml
+      );
+
       // Sending Order Processed email
       const orderProcessedHtml = orderProcessedEmailTemplate(order);
       sendEmail(
-        order.user.email,
+        [order.user.email],
         order.user.name,
         'Tu pedido ha sido recibido',
         orderProcessedHtml
@@ -546,7 +556,7 @@ orderRouter.put(
       // Sending Estimated Delivery email
       const estimatedDeliveryHtml = estimatedDeliveryEmailTemplate(order);
       sendEmail(
-        order.user.email,
+        [order.user.email],
         order.user.name,
         'Tu pedido está siendo preparado',
         estimatedDeliveryHtml
@@ -576,7 +586,7 @@ orderRouter.put(
       // Sending Order Is Ready email
       const orderIsReadyHtml = orderIsReadyEmailTemplate(order);
       sendEmail(
-        order.user.email,
+        [order.user.email],
         order.user.name,
         'Tu pedido va en camino',
         orderIsReadyHtml
@@ -606,7 +616,7 @@ orderRouter.put(
       // Sending Order Delivered email
       const orderDeliveredHtml = orderDeliveredEmailTemplate(order);
       sendEmail(
-        order.user.email,
+        [order.user.email],
         order.user.name,
         'Tu pedido ha sido entregado',
         orderDeliveredHtml

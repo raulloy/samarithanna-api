@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     userType: {
       type: String,
-      enum: ['admin', 'delivery', 'user'],
+      enum: ['admin', 'logistics', 'delivery', 'user'],
       required: true,
     },
     isAdmitted: { type: Boolean, default: false, required: true },

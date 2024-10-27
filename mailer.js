@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 
-export const sendEmail = (email, name, subject, htmlContent) => {
+export const sendEmail = (emails, name, subject, htmlContent) => {
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
@@ -13,7 +13,7 @@ export const sendEmail = (email, name, subject, htmlContent) => {
 
   const mailOptions = {
     from: '"Raul Loyola" <raul.loy@gmail.com>', // Sender address
-    to: `${name} <${email}>`, // Receiver email
+    to: Array.isArray(emails) ? emails.join(', ') : emails, // Receiver emails
     subject: subject, // Email subject passed as a parameter
     html: htmlContent, // HTML content passed as a parameter
   };
