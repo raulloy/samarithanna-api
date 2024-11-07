@@ -85,7 +85,7 @@ userRouter.post(
       password: bcrypt.hashSync(req.body.password),
       userType: req.body.userType || 'user',
       isAdmitted: req.body.isAdmitted || false,
-      exclusive: user.exclusive || false,
+      exclusive: req.body.exclusive || false,
     });
 
     const user = await newUser.save();
@@ -95,6 +95,7 @@ userRouter.post(
       email: user.email,
       userType: user.userType,
       isAdmitted: user.isAdmitted,
+      exclusive: user.exclusive,
       token: generateToken(user),
     });
 
