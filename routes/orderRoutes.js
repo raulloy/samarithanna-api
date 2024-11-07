@@ -24,9 +24,7 @@ orderRouter.get(
   // isAdmin,
   isAdminOrDelivery,
   expressAsyncHandler(async (req, res) => {
-    const orders = await Order.find()
-      .populate('user', 'name')
-      .sort({ createdAt: -1 });
+    const orders = await Order.find().populate('user', 'name').sort({ createdAt: -1 });
     res.send(orders);
   })
 );
@@ -62,14 +60,8 @@ orderRouter.get(
   isAuth,
   isAdmin,
   expressAsyncHandler(async (req, res) => {
-    const startOfWeek = moment()
-      .tz('America/Mexico_City')
-      .startOf('isoWeek')
-      .toDate();
-    const endOfWeek = moment()
-      .tz('America/Mexico_City')
-      .endOf('isoWeek')
-      .toDate();
+    const startOfWeek = moment().tz('America/Mexico_City').startOf('isoWeek').toDate();
+    const endOfWeek = moment().tz('America/Mexico_City').endOf('isoWeek').toDate();
 
     // console.log('Start of week:', startOfWeek);
     // console.log('End of week:', endOfWeek);
@@ -252,19 +244,10 @@ orderRouter.get(
   isAuth,
   isAdmin,
   expressAsyncHandler(async (req, res) => {
-    const startOfCurrentWeek = moment()
-      .startOf('isoWeek')
-      .add(1, 'day')
-      .toDate();
+    const startOfCurrentWeek = moment().startOf('isoWeek').add(1, 'day').toDate();
     const endOfCurrentWeek = moment().endOf('isoWeek').add(1, 'day').toDate();
-    const startOfLastWeek = moment()
-      .subtract(1, 'weeks')
-      .startOf('isoWeek')
-      .toDate();
-    const endOfLastWeek = moment()
-      .subtract(1, 'weeks')
-      .endOf('isoWeek')
-      .toDate();
+    const startOfLastWeek = moment().subtract(1, 'weeks').startOf('isoWeek').toDate();
+    const endOfLastWeek = moment().subtract(1, 'weeks').endOf('isoWeek').toDate();
 
     // console.log('Start of current week:', startOfCurrentWeek);
     // console.log('End of current week:', endOfCurrentWeek);
@@ -273,14 +256,8 @@ orderRouter.get(
 
     const users = await User.find({ daysFrequency: 14 }, 'name minOrders');
 
-    const currentWeekOrders = await getUsersDailyTracking(
-      startOfCurrentWeek,
-      endOfCurrentWeek
-    );
-    const lastWeekOrders = await getUsersDailyTracking(
-      startOfLastWeek,
-      endOfLastWeek
-    );
+    const currentWeekOrders = await getUsersDailyTracking(startOfCurrentWeek, endOfCurrentWeek);
+    const lastWeekOrders = await getUsersDailyTracking(startOfLastWeek, endOfLastWeek);
 
     // Inicializar el objeto de seguimiento de usuarios con todos los usuarios para ambas semanas
     const usersTracking = users.reduce((acc, user) => {
@@ -323,8 +300,7 @@ orderRouter.get(
       if (usersTracking[userId.toString()]) {
         dailyOrders.forEach(({ day, ordersCount }) => {
           const weekDay = getWeekDay(day); // Convertir la fecha en nombre del día de la semana
-          usersTracking[userId.toString()].currentWeek.orders[weekDay] =
-            ordersCount;
+          usersTracking[userId.toString()].currentWeek.orders[weekDay] = ordersCount;
         });
         usersTracking[userId.toString()].currentWeek.totalOrders = totalOrders;
       }
@@ -336,8 +312,7 @@ orderRouter.get(
       if (usersTracking[userId.toString()]) {
         dailyOrders.forEach(({ day, ordersCount }) => {
           const weekDay = getWeekDay(day); // Convertir la fecha en nombre del día de la semana
-          usersTracking[userId.toString()].lastWeek.orders[weekDay] =
-            ordersCount;
+          usersTracking[userId.toString()].lastWeek.orders[weekDay] = ordersCount;
         });
         usersTracking[userId.toString()].lastWeek.totalOrders = totalOrders;
       }
@@ -482,9 +457,7 @@ orderRouter.get(
   '/mine/recent-orders',
   isAuth,
   expressAsyncHandler(async (req, res) => {
-    const orders = await Order.find({ user: req.user._id })
-      .sort({ createdAt: -1 })
-      .limit(10);
+    const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(10);
     res.send(orders);
   })
 );
@@ -506,10 +479,7 @@ orderRouter.put(
   '/:id/order-processed',
   isAuth,
   expressAsyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id).populate(
-      'user',
-      'email name'
-    );
+    const order = await Order.findById(req.params.id).populate('user', 'email name');
     if (order) {
       order.orderEmailSent = true;
 
@@ -517,21 +487,11 @@ orderRouter.put(
 
       // Sending New Order email
       const orderProcessedAdminHtml = orderProcessedAdmin(order);
-      sendEmail(
-        ['raul.loy@gmail.com'],
-        order.user.name,
-        `Nuevo Pedido de ${order.user.name}`,
-        orderProcessedAdminHtml
-      );
+      sendEmail(['raul.loy@gmail.com'], order.user.name, `Nuevo Pedido de ${order.user.name}`, orderProcessedAdminHtml);
 
       // Sending Order Processed email
       const orderProcessedHtml = orderProcessedEmailTemplate(order);
-      sendEmail(
-        [order.user.email],
-        order.user.name,
-        'Tu pedido ha sido recibido',
-        orderProcessedHtml
-      );
+      sendEmail([order.user.email], order.user.name, 'Tu pedido ha sido recibido', orderProcessedHtml);
 
       res.send({ message: 'Order Processed', order: updatedOrder });
     } else {
@@ -544,10 +504,7 @@ orderRouter.put(
   '/:id/estimatedDelivery',
   isAuth,
   expressAsyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id).populate(
-      'user',
-      'email name'
-    );
+    const order = await Order.findById(req.params.id).populate('user', 'email name');
     if (order) {
       order.estimatedDelivery = req.body.estimatedDelivery;
 
@@ -555,12 +512,7 @@ orderRouter.put(
 
       // Sending Estimated Delivery email
       const estimatedDeliveryHtml = estimatedDeliveryEmailTemplate(order);
-      sendEmail(
-        [order.user.email],
-        order.user.name,
-        'Tu pedido está siendo preparado',
-        estimatedDeliveryHtml
-      );
+      sendEmail([order.user.email], order.user.name, 'Tu pedido está siendo preparado', estimatedDeliveryHtml);
 
       res.send({ message: 'Order delivery scheduled', order: updatedOrder });
     } else {
@@ -573,10 +525,7 @@ orderRouter.put(
   '/:id/ready',
   isAuth,
   expressAsyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id).populate(
-      'user',
-      'email name'
-    );
+    const order = await Order.findById(req.params.id).populate('user', 'email name');
     if (order) {
       order.isReady = true;
       order.readyAt = Date.now();
@@ -585,12 +534,7 @@ orderRouter.put(
 
       // Sending Order Is Ready email
       const orderIsReadyHtml = orderIsReadyEmailTemplate(order);
-      sendEmail(
-        [order.user.email],
-        order.user.name,
-        'Tu pedido va en camino',
-        orderIsReadyHtml
-      );
+      sendEmail([order.user.email], order.user.name, 'Tu pedido va en camino', orderIsReadyHtml);
 
       res.send({ message: 'Order Ready', order: updatedOrder });
     } else {
@@ -603,10 +547,7 @@ orderRouter.put(
   '/:id/deliver',
   isAuth,
   expressAsyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id).populate(
-      'user',
-      'email name'
-    );
+    const order = await Order.findById(req.params.id).populate('user', 'email name');
     if (order) {
       order.deliveredAt = Date.now();
       order.isDelivered = true;
@@ -615,12 +556,7 @@ orderRouter.put(
 
       // Sending Order Delivered email
       const orderDeliveredHtml = orderDeliveredEmailTemplate(order);
-      sendEmail(
-        [order.user.email],
-        order.user.name,
-        'Tu pedido ha sido entregado',
-        orderDeliveredHtml
-      );
+      sendEmail([order.user.email], order.user.name, 'Tu pedido ha sido entregado', orderDeliveredHtml);
 
       res.send({ message: 'Order Delivered', order: updatedOrder });
     } else {

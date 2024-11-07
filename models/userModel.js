@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
     isAdmitted: { type: Boolean, default: false, required: true },
+    exclusive: { type: Boolean, default: false },
     daysFrequency: { type: Number },
     minOrders: { type: Number },
   },

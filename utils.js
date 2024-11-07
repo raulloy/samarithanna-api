@@ -42,10 +42,7 @@ export const isAdmin = (req, res, next) => {
 };
 
 export const isAdminOrDelivery = (req, res, next) => {
-  if (
-    req.user &&
-    (req.user.userType === 'admin' || req.user.userType === 'delivery')
-  ) {
+  if (req.user && (req.user.userType === 'admin' || req.user.userType === 'delivery')) {
     next();
   } else {
     res.status(401).send({ message: 'Access Denied' });
@@ -95,9 +92,7 @@ export const orderProcessedAdmin = (order) => {
       <h1 style="color: #333;">Nuevo pedido de ${order.user.name}</h1>
       <h2 style="color: #444;">Pedido S-${orderIdLast5}</h2>
       <div style="margin: 1rem">
-        <a href="https://samarithanna.vercel.app/order/${
-          order._id
-        }" target="_blank" rel="noopener noreferrer">Ver pedido</a>
+        <a href="https://samarithanna.vercel.app/order/${order._id}" target="_blank" rel="noopener noreferrer">Ver pedido</a>
       </div>
       <table style="margin: auto; width: 80%; border-collapse: collapse; border: 1px solid #ccc;">
         <thead>
@@ -112,15 +107,9 @@ export const orderProcessedAdmin = (order) => {
             .map(
               (item) => `
             <tr>
-              <td style="border: 1px solid #ddd; padding: 8px;">${
-                item.name
-              }</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${
-                item.quantity
-              }</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${item.price.toFixed(
-                2
-              )}</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${item.name}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.quantity}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${item.price.toFixed(2)}</td>
             </tr>
           `
             )
@@ -130,23 +119,17 @@ export const orderProcessedAdmin = (order) => {
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Subtotal:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.subtotal.toFixed(
-              2
-            )}</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.subtotal.toFixed(2)}</strong></td>
           </tr>
           <tr>
           <td style="border: 1px solid #ddd; padding: 8px;"></td>
           <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>IEPS:</strong></td>
-          <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-            order.ieps
-          }</strong></td>
+          <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.ieps}</strong></td>
         </tr>
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Total:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.totalPrice.toFixed(
-              2
-            )}</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.totalPrice.toFixed(2)}</strong></td>
           </tr>
         </tfoot>
       </table>
@@ -182,15 +165,9 @@ export const orderProcessedEmailTemplate = (order) => {
             .map(
               (item) => `
             <tr>
-              <td style="border: 1px solid #ddd; padding: 8px;">${
-                item.name
-              }</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${
-                item.quantity
-              }</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${item.price.toFixed(
-                2
-              )}</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${item.name}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.quantity}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${item.price.toFixed(2)}</td>
             </tr>
           `
             )
@@ -200,23 +177,17 @@ export const orderProcessedEmailTemplate = (order) => {
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Subtotal:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.subtotal.toFixed(
-              2
-            )}</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.subtotal.toFixed(2)}</strong></td>
           </tr>
           <tr>
           <td style="border: 1px solid #ddd; padding: 8px;"></td>
           <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>IEPS:</strong></td>
-          <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-            order.ieps
-          }</strong></td>
+          <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.ieps}</strong></td>
         </tr>
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Total:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.totalPrice.toFixed(
-              2
-            )}</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.totalPrice.toFixed(2)}</strong></td>
           </tr>
         </tfoot>
       </table>
@@ -237,15 +208,12 @@ export const estimatedDeliveryEmailTemplate = (order) => {
     <div style="text-align: center;">
       <h1 style="color: #333;">¡Tu pedido está siendo preparado!</h1>
       <p>Hola ${order.user.name},</p>
-      <p>Tu pedido está siendo preparado y se entregará el ${order.estimatedDelivery.toLocaleDateString(
-        'es-MX',
-        {
-          timeZone: 'UTC',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }
-      )}.</p>
+      <p>Tu pedido está siendo preparado y se entregará el ${order.estimatedDelivery.toLocaleDateString('es-MX', {
+        timeZone: 'UTC',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })}.</p>
       <h2 style="color: #444;">Pedido S-${orderIdLast5}</h2>
       <table style="margin: auto; width: 80%; border-collapse: collapse; border: 1px solid #ccc;">
         <thead>
@@ -272,23 +240,17 @@ export const estimatedDeliveryEmailTemplate = (order) => {
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Subtotal:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-              order.subtotal
-            }</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.subtotal}</strong></td>
           </tr>
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>IEPS:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-              order.ieps
-            }</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.ieps}</strong></td>
           </tr>
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Total:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-              order.totalPrice
-            }</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.totalPrice}</strong></td>
           </tr>
         </tfoot>
       </table>
@@ -324,15 +286,9 @@ export const orderIsReadyEmailTemplate = (order) => {
             .map(
               (item) => `
             <tr>
-              <td style="border: 1px solid #ddd; padding: 8px;">${
-                item.name
-              }</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${
-                item.quantity
-              }</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${item.price.toFixed(
-                2
-              )}</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${item.name}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.quantity}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${item.price.toFixed(2)}</td>
             </tr>
           `
             )
@@ -342,30 +298,24 @@ export const orderIsReadyEmailTemplate = (order) => {
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Subtotal:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-              order.subtotal
-            }</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.subtotal}</strong></td>
           </tr>
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>IEPS:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-              order.ieps
-            }</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.ieps}</strong></td>
           </tr>
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Total:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-              order.totalPrice
-            }</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.totalPrice}</strong></td>
           </tr>
         </tfoot>
       </table>
       <h2 style="color: #444;">Dirección de envío</h2>
       <p>
-        ${order.shippingAddress.fullName},<br/>
-        ${order.shippingAddress.address},<br/><br/>
+        ${order?.shippingAddress?.fullName},<br/>
+        ${order?.shippingAddress?.address},<br/><br/>
       <p>¡Gracias por tu preferencia!.</p>
       <hr style="border: 1px solid #f2f2f2; width: 80%;">
     </div>
@@ -406,23 +356,17 @@ export const orderDeliveredEmailTemplate = (order) => {
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Subtotal:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-              order.subtotal
-            }</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.subtotal}</strong></td>
           </tr>
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>IEPS:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-              order.ieps
-            }</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.ieps}</strong></td>
           </tr>
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;"></td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Total:</strong></td>
-            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${
-              order.totalPrice
-            }</strong></td>
+            <td style="text-align: right; border: 1px solid #ddd; padding: 8px;"><strong>$${order.totalPrice}</strong></td>
           </tr>
         </tfoot>
       </table>

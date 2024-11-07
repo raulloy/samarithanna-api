@@ -15,9 +15,7 @@ const accentsMap = {
 
 // Función para escapar caracteres especiales en la expresión regular y reemplazar vocales con sus variantes acentuadas
 const escapeRegExp = (string) => {
-  return string
-    .replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1')
-    .replace(/[aeiou]/gi, (matched) => accentsMap[matched.toLowerCase()]);
+  return string.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1').replace(/[aeiou]/gi, (matched) => accentsMap[matched.toLowerCase()]);
 };
 
 productRouter.get('/', async (req, res) => {
@@ -38,6 +36,7 @@ productRouter.post(
       category: 'sample category',
       productQty: '480 gr.',
       presentation: 'Pieza, Paquete...',
+      exclusive: false,
       countInStock: 100,
       description: 'sample description',
     });
@@ -60,6 +59,7 @@ productRouter.put(
       product.category = req.body.category;
       product.productQty = req.body.productQty;
       product.presentation = req.body.presentation;
+      product.exclusive = Boolean(req.body.exclusive);
       product.image = req.body.image;
       product.description = req.body.description;
       await product.save();

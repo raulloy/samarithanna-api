@@ -2,12 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import expressAsyncHandler from 'express-async-handler';
 import User from '../models/userModel.js';
-import {
-  isAuth,
-  isAdmin,
-  generateToken,
-  welcomeEmailTemplate,
-} from '../utils.js';
+import { isAuth, isAdmin, generateToken, welcomeEmailTemplate } from '../utils.js';
 import { sendEmail } from '../mailer.js';
 
 const userRouter = express.Router();
@@ -47,6 +42,7 @@ userRouter.put(
       user.email = req.body.email || user.email;
       user.userType = req.body.userType || user.userType;
       user.isAdmitted = req.body.isAdmitted ?? user.isAdmitted;
+      user.exclusive = req.body.exclusive ?? user.exclusive;
       user.daysFrequency = req.body.daysFrequency;
       user.minOrders = req.body.minOrders;
 
@@ -70,6 +66,7 @@ userRouter.post(
           email: user.email,
           userType: user.userType,
           isAdmitted: user.isAdmitted,
+          exclusive: user.exclusive,
           token: generateToken(user),
         });
         return;
@@ -88,6 +85,7 @@ userRouter.post(
       password: bcrypt.hashSync(req.body.password),
       userType: req.body.userType || 'user',
       isAdmitted: req.body.isAdmitted || false,
+      exclusive: user.exclusive || false,
     });
 
     const user = await newUser.save();
